@@ -37,26 +37,33 @@ class AppannieSpider(BaseSpider):
 		#Retrieve app name
 		item['name'] = hxs.select('//ul[@class="app_main_info"]/li[@class="app"]/span/text()').extract()[0]
 
-		#Retrieve dev name
-		item['developer_name'] = hxs.select('//ul[@class="app_info"]/li[contains(@class, "publisher")]/span/a/b/text()').extract()[0]
+		#Retrieve company
+		app_info = hxs.select('//ul[@class="app_info"]')
+		item['company'] = app_info.select('.//li[contains(@class, "publisher")]/span/a/b/text()').extract()[0]
+
+		#Retrieve store url
+		item['store_url'] = app_info.select('.//li[contains(@class, "appstore")]/span/a/@href').extract()[0]
 
 		#Retrieve developer's website and/or email
-		side_bar = hxs.select('//div[@id="app_sidebar"]/div/div/ul')
-		no_of_links = len(side_bar.select(".//li").extract())
+		side_bar_links = hxs.select('//div[@id="app_sidebar"]/div[@class="app-box-links links"]/div/ul')
+		no_of_links = len(side_bar_links.select(".//li").extract())
 		if no_of_links == 2:
-			item['developer_website'] = side_bar.select(".//li[1]/a/@href").extract()[0]
-			item['developer_email'] = side_bar.select(".//li[2]/a/@href").extract()[0].split(":")[1]
+			item['developer_website'] = side_bar_links.select(".//li[1]/a/@href").extract()[0]
+			item['email'] = side_bar_links.select(".//li[2]/a/@href").extract()[0].split(":")[1]
 		elif no_of_links == 1:
-			link = side_bar.select(".//li[1]/a/@href").extract()[0].split(":")[1]
+			link = side_bar_links.select(".//li[1]/a/@href").extract()[0].split(":")[1]
 			if is_valid_email(link):
 				item['developer_website'] = None
-				item['developer_email'] = link
+				item['email'] = link
 			else:
 				item['developer_website'] = link
-				item['developer_email'] = None
+				item['email'] = None
 		else:
 			item['developer_website'] = None
-			item['developer_email'] = None
+			item['email'] = None
+
+		#Retrieve category
+		item['category'] = hxs.select("//div[@class='app-box-itemlist about_app']/div/p[3]/text()").extract()[0]
 
 		#Retrieve downloads
 		downloads = hxs.select("//div[@class='app-box-itemlist about_app']/div/p[6]/text()").extract()[0].split("-")
