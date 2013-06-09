@@ -2,6 +2,7 @@ Scrapy==0.16.5
 Twisted==13.0.0
 argparse==1.2.1
 lxml==3.2.1
+mongoengine==0.8.2
 pyOpenSSL==0.13
 pymongo==2.5.2
 w3lib==1.3
