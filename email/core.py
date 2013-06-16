@@ -1,11 +1,11 @@
-import smtplib, email, logging
+import smtplib, email, logging, re
 from email.parser import Parser
 from errors import EmailerError
-
 import sys
 sys.path.append("/home/george/projects/growth-hacking-toolkit/src")
 from utils.tools import is_valid_email
 
+#Setup the logger
 logger = logging.getLogger('emailer')
 logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
@@ -16,18 +16,31 @@ class Emailer(object):
 	"""
 	The core class that deals with sending emails.
 	"""
-	def __init__(self, sender=None, recipients=None, subject=None, msg=None):
+	def __init__(self, template_file=None):
 		"""
 		Instantiates a new emailer object.
 		"""
-		self.sender = sender
-		if recipients is None:			
-			recipients = []
-		self.recipients = recipients
+		self.sender = None
+		self.recipient = None
 
-		self.subject = subject
-		self.msg = msg
+		self.subject = None
+		
+		fp = open(template_file, 'rb')
+		self.msg = email.message_from_file(fp)
+		fp.close()
+		
+		self.smpt_server = None
 		self.smtp_server_settings = None
+
+	def set_subject(self, subject):
+		"""
+		Sets the subject of the email. 
+		"""
+		self.subject = subject
+		if self.msg.has_key('Subject'):
+			self.msg.replace_header('Subject', self.subject)
+		else:
+			self.msg['Subject'] = self.subject
 
 	def set_sender(self, sender):
 		"""
@@ -35,33 +48,25 @@ class Emailer(object):
 		"""
 		if is_valid_email(sender):
 			self.sender = sender
+			if self.msg.has_key('From'):
+				self.msg.replace_header('From', self.sender)
+			else:
+				self.msg['From'] = self.sender
 		else:
 			raise EmailerError(msg="The provided sender email is not valid.")
 
-	def set_recipients(self, recipients):
+	def set_recipient(self, recipient):
 		"""
-		Sets the recipients of the email. Performs email validation.
+		Sets the recipient of the email. Performs email validation.
 		"""
-		for recipient in recipients:
-			if is_valid_email(recipient):
-				self.recipients.append(recipient) 
+		if is_valid_email(recipient):
+			self.recipient = recipient 
+			if self.msg.has_key('To'):
+				self.msg.replace_header('To', self.recipient)
 			else:
-				raise EmailerError(msg="The provided recepient email: " + recipient + " is not valid.")
-
-	def create_msg(self):
-		"""
-		Creates a message object.
-		"""
-		raise NotImplementedError("Subclasses must implement this method.")
-
-	# def _parse_headers(self):
-	# 	"""
-	# 	Parses RFC822 headers. Supposed to be a private method.
-	# 	"""
-	# 	header  = 'From: %s\n' % self.sender
-	# 	header += 'To: %s\n' % ','.join(self.recipients)
-	# 	header += 'Subject: %s\n\n' % self.subject
-	# 	return header
+				self.msg['To'] = self.recipient
+		else:
+			raise EmailerError(msg="The provided recepient email: " + recipient + " is not valid.")
 
 	def setup_smpt_server(self, smtp_server="smtp.gmail.com:587", username=None, password=None):
 		"""
@@ -72,57 +77,24 @@ class Emailer(object):
 			username  = username,
 			password = password
 		)
+	
+	def send_mail(self, logging=False):
 
-	def send_mail(self, one_by_one=False, logging=False):
-		self._create_msg()
-
-		if self.smtp_server_settings:
-			s = smtplib.SMTP(self.smtp_server_settings['smtp_server'])
-		else:
-			raise EmailerError("You have to setup the SMTP server using setup_smpt_server()")
-
-		s.starttls()
-
-		if self.smtp_server_settings['smtp_server'] == "smtp.gmail.com:587":
+		self.smpt_server = smtplib.SMTP(self.smtp_server_settings['smtp_server'])
+		self.smpt_server.starttls()
+		try:
 			username = self.smtp_server_settings['username']
 			password = self.smtp_server_settings['password']
-			s.login(username, password)
+			self.smpt_server.login(username, password)
+		except smtplib.SMTPAuthenticationError:
+			raise EmailerError(msg="SMTP authentication failed.")
 
-		if self.sender and len(self.recipients) != 0:
-			if not one_by_one: 		
-				logger.info('Sending email from %s' % self.sender)
-				self.msg["To"] = '%s\n' % ','.join(self.recipients)
-				s.sendmail(self.sender, self.recipients, self.msg.as_string())
-			else:
-				for recipient in self.recipients:
-					logger.info('Sending email from %s to %s' % (self.sender, recipient))
-					if self.msg.has_key('To'):
-					    self.msg.replace_header('to', recipient)
-					else:
-					    self.msg['To'] = recipient
-					s.sendmail(self.sender, recipient, self.msg.as_string())
+		if self.sender and self.recipient:
+			logger.info('Sending email from %s to %s' % (self.sender, self.recipient))
+			#self.smpt_server.sendmail(self.sender, self.recipient, self.msg.as_string())
 		else:
-			raise EmailerError("Either recipient list is empty or no sender address has been specified.")
+			raise EmailerError("Either recipient or sender address has not been specified.")
 			
-		s.quit()
+		self.smpt_server.quit()
 
-class FileEmailer(Emailer):
-	"""
-	Sends emails using templates from files.
-	"""
-	def __init__(self, sender, recipients, subject, msg_file):
-		super( FileEmailer, self ).__init__(sender, recipients, subject, None)
-		self.msg_file = msg_file
-
-	def _create_msg(self):
-		"""
-		Creates a message object.
-		"""
-		fp = open(self.msg_file, 'rb')
-		self.msg = email.message_from_file(fp)
-		self.msg["Subject"] = self.subject
-		self.msg["From"] = self.sender
-		fp.close()
-
-
-
+		
