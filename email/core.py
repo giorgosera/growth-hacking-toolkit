@@ -54,14 +54,14 @@ class Emailer(object):
 		"""
 		raise NotImplementedError("Subclasses must implement this method.")
 
-	def _parse_headers(self):
-		"""
-		Parses RFC822 headers. Supposed to be a private method.
-		"""
-		header  = 'From: %s\n' % self.sender
-		header += 'To: %s\n' % ','.join(self.recipients)
-		header += 'Subject: %s\n\n' % self.subject
-		return header
+	# def _parse_headers(self):
+	# 	"""
+	# 	Parses RFC822 headers. Supposed to be a private method.
+	# 	"""
+	# 	header  = 'From: %s\n' % self.sender
+	# 	header += 'To: %s\n' % ','.join(self.recipients)
+	# 	header += 'Subject: %s\n\n' % self.subject
+	# 	return header
 
 	def setup_smpt_server(self, smtp_server="smtp.gmail.com:587", username=None, password=None):
 		"""
@@ -75,7 +75,6 @@ class Emailer(object):
 
 	def send_mail(self, one_by_one=False, logging=False):
 		self._create_msg()
-		msg = self._parse_headers() + self.msg.as_string()
 
 		if self.smtp_server_settings:
 			s = smtplib.SMTP(self.smtp_server_settings['smtp_server'])
@@ -92,11 +91,16 @@ class Emailer(object):
 		if self.sender and len(self.recipients) != 0:
 			if not one_by_one: 		
 				logger.info('Sending email from %s' % self.sender)
-				s.sendmail(self.sender, self.recipients, msg)
+				self.msg["To"] = '%s\n' % ','.join(self.recipients)
+				s.sendmail(self.sender, self.recipients, self.msg.as_string())
 			else:
 				for recipient in self.recipients:
 					logger.info('Sending email from %s to %s' % (self.sender, recipient))
-					s.sendmail(self.sender, [recipient], msg)
+					if self.msg.has_key('To'):
+					    self.msg.replace_header('to', recipient)
+					else:
+					    self.msg['To'] = recipient
+					s.sendmail(self.sender, recipient, self.msg.as_string())
 		else:
 			raise EmailerError("Either recipient list is empty or no sender address has been specified.")
 			
@@ -116,6 +120,8 @@ class FileEmailer(Emailer):
 		"""
 		fp = open(self.msg_file, 'rb')
 		self.msg = email.message_from_file(fp)
+		self.msg["Subject"] = self.subject
+		self.msg["From"] = self.sender
 		fp.close()
 
 
