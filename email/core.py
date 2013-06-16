@@ -85,7 +85,7 @@ class Emailer(object):
 
 		if self.sender and self.recipient:
 			logger.info('Sending email from %s to %s' % (self.sender, self.recipient))
-			#self.smpt_server.sendmail(self.sender, self.recipient, self.msg.as_string())
+			self.smpt_server.sendmail(self.sender, self.recipient, self.msg.as_string())
 		else:
 			raise EmailerError("Either recipient or sender address has not been specified.")
 			

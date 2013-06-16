@@ -1,6 +1,6 @@
 from core import PersonalisedEmailer
 
-email_subject = "Hello World"
+email_subject = "Mass email bitches"
 email_template_file = "/home/george/akka.txt"
 leads_csv_file = "/home/george/leads.csv"
 
