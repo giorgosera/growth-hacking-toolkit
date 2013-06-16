@@ -1,4 +1,4 @@
-import smtplib, email, logging, re
+import smtplib, email, logging, re, csv
 from email.parser import Parser
 from errors import EmailerError
 import sys
@@ -16,31 +16,33 @@ class Emailer(object):
 	"""
 	The core class that deals with sending emails.
 	"""
-	def __init__(self, template_file=None):
+	def __init__(self, template_file):
 		"""
 		Instantiates a new emailer object.
 		"""
 		self.sender = None
 		self.recipient = None
-
 		self.subject = None
-		
-		fp = open(template_file, 'rb')
-		self.msg = email.message_from_file(fp)
-		fp.close()
-		
 		self.smpt_server = None
 		self.smtp_server_settings = None
+		self.template_file = template_file
+
+	def construct_msg(self):
+		"""
+		Sets the msg of the email. 
+		"""
+		fp = open(self.template_file, 'rb')
+		self.msg = email.message_from_file(fp)
+		fp.close()
+		self.msg['Subject'] = self.subject
+		self.msg['From'] = self.sender
+		self.msg['To'] = self.recipient
 
 	def set_subject(self, subject):
 		"""
 		Sets the subject of the email. 
 		"""
 		self.subject = subject
-		if self.msg.has_key('Subject'):
-			self.msg.replace_header('Subject', self.subject)
-		else:
-			self.msg['Subject'] = self.subject
 
 	def set_sender(self, sender):
 		"""
@@ -48,10 +50,6 @@ class Emailer(object):
 		"""
 		if is_valid_email(sender):
 			self.sender = sender
-			if self.msg.has_key('From'):
-				self.msg.replace_header('From', self.sender)
-			else:
-				self.msg['From'] = self.sender
 		else:
 			raise EmailerError(msg="The provided sender email is not valid.")
 
@@ -61,10 +59,6 @@ class Emailer(object):
 		"""
 		if is_valid_email(recipient):
 			self.recipient = recipient 
-			if self.msg.has_key('To'):
-				self.msg.replace_header('To', self.recipient)
-			else:
-				self.msg['To'] = self.recipient
 		else:
 			raise EmailerError(msg="The provided recepient email: " + recipient + " is not valid.")
 
@@ -97,4 +91,48 @@ class Emailer(object):
 			
 		self.smpt_server.quit()
 
-		
+
+class PersonalisedEmailer(Emailer):
+	"""
+	Sends personalised emails using templates from files and data loaded from csv.
+	"""
+	def __init__(self, csv_file=None, template_file=None):
+		super( PersonalisedEmailer, self ).__init__(template_file)
+		self.rules_dict = None
+		self.csv_file = csv_file
+		self.regex = re.compile('(\\*\\|)((?:[a-z][a-z0-9_]*))(\\|\\*)',re.IGNORECASE|re.DOTALL)
+
+	def personalise(self, entry):
+		"""
+		Parses a text file replacing placeholders with the data from the csv according to
+		the specified rules.
+		"""		
+		def repl(m):
+			rule_value = self.rules_dict[m.group(2)]
+			return entry[rule_value]
+
+		self.msg.set_payload(re.sub(self.regex, repl, self.msg.get_payload()))
+
+	def send_mail(self):
+
+		f = open(self.csv_file, 'rb') 
+		try:
+			reader = csv.reader(f)  
+			header = None
+			for i, row in enumerate(reader):   
+				if i == 0:
+					header = row
+				else:
+					entry = {key: row[j] for j, key in enumerate(header)}
+					try:
+						self.set_recipient(entry['Email']) 
+					except KeyError, e:
+						raise EmailerError("The CSV file must contain a column of email addresses.")
+					self.construct_msg()
+					self.personalise(entry)					
+					try:
+						super(PersonalisedEmailer, self).send_mail(logging=True)
+					except EmailerError, e:
+						print str(e.msg)					
+		finally:
+			f.close()     
