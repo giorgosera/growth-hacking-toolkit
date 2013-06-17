@@ -10,6 +10,8 @@ logger = logging.getLogger('emailer')
 logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
+formatter = logging.Formatter('[%(name)-2s: %(levelname)-1s] %(message)s')
+ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 class Emailer(object):
@@ -72,7 +74,7 @@ class Emailer(object):
 			password = password
 		)
 	
-	def send_mail(self, logging=False):
+	def send_mail(self):
 
 		self.smpt_server = smtplib.SMTP(self.smtp_server_settings['smtp_server'])
 		self.smpt_server.starttls()
@@ -84,8 +86,8 @@ class Emailer(object):
 			raise EmailerError(msg="SMTP authentication failed.")
 
 		if self.sender and self.recipient:
-			logger.info('Sending email from %s to %s' % (self.sender, self.recipient))
-			self.smpt_server.sendmail(self.sender, self.recipient, self.msg.as_string())
+			#self.smpt_server.sendmail(self.sender, self.recipient, self.msg.as_string())
+			logger.info('Sent email from %s to %s' % (self.sender, self.recipient))
 		else:
 			raise EmailerError("Either recipient or sender address has not been specified.")
 			
@@ -101,20 +103,31 @@ class PersonalisedEmailer(Emailer):
 		self.rules_dict = None
 		self.csv_file = csv_file
 		self.regex = re.compile('(\\*\\|)((?:[a-z][a-z0-9_]*))(\\|\\*)',re.IGNORECASE|re.DOTALL)
+		self.assisted = False
 
 	def personalise(self, entry):
 		"""
 		Parses a text file replacing placeholders with the data from the csv according to
 		the specified rules.
 		"""		
+		logger.info("Personalising email for %s" % entry['Email'])
 		def repl(m):
 			rule_value = self.rules_dict[m.group(2)]
-			return entry[rule_value]
+			placeholder_value = entry[rule_value]
+
+			#If assisted is selected the user will review the placeholder values
+			if self.assisted:
+				c = None
+				while (c  not in ['Y', 'N']):
+					c = raw_input(" > Replace placeholder %s with '%s'? [Y/N]: " % (m.group(1) + m.group(2) +m.group(3), entry[rule_value]))
+				if c == 'N':
+					placeholder_value = raw_input(" > Type the correct value for placeholder %s : " % m.group(1) + m.group(2) +m.group(3))
+			return placeholder_value
 
 		self.msg.set_payload(re.sub(self.regex, repl, self.msg.get_payload()))
 
-	def send_mail(self):
-
+	def send_mail(self, assisted=False):
+		self.assisted = assisted
 		f = open(self.csv_file, 'rb') 
 		try:
 			reader = csv.reader(f)  
@@ -129,9 +142,19 @@ class PersonalisedEmailer(Emailer):
 					except KeyError, e:
 						raise EmailerError("The CSV file must contain a column of email addresses.")
 					self.construct_msg()
-					self.personalise(entry)					
+					self.personalise(entry)
+					if self.assisted:
+						print "======================================="
+						logger.info(self.msg)
+						print "======================================="
+						c = None
+						while (c  not in ['Y', 'N']):		
+							c = raw_input(" > Is it OK to send? [Y/N]")
+						if c == 'N':
+							logger.info("Skipping email to %s" % entry['Email'])
+							return
 					try:
-						super(PersonalisedEmailer, self).send_mail(logging=True)
+						super(PersonalisedEmailer, self).send_mail()
 					except EmailerError, e:
 						print str(e.msg)					
 		finally:
