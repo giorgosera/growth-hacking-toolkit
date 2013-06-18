@@ -12,7 +12,7 @@ SPIDER_MODULES = ['appannie.spiders']
 ITEM_PIPELINES = ['appannie.pipelines.AppanniePipeline']
 NEWSPIDER_MODULE = 'appannie.spiders'
 COOKIES_ENABLED = False
-DOWNLOAD_DELAY = 0.25
+DOWNLOAD_DELAY = 2.0
 
 MONGODB_SERVER = "localhost"
 MONGODB_PORT = 27017

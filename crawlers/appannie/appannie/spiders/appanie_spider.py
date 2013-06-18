@@ -2,6 +2,7 @@ from scrapy.spider import BaseSpider
 from scrapy.selector import HtmlXPathSelector
 from appannie.items import AndroidAppItem
 from scrapy.http.request import Request
+from scrapy.http import FormRequest
 from urlparse import urljoin
 import sys
 sys.path.append("/home/george/projects/growth-hacking-toolkit/src")
@@ -15,6 +16,14 @@ class AppannieSpider(BaseSpider):
 		self.start_urls = ['http://www.appannie.com/top/android/%s/application/%s/' % (country, category)]
 
 	def parse(self, response):
+
+		#Make first 
+		request = Request("http://www.appannie.com/top-table/android/20130617-US-19/?p=2-&h=8&iap=all",
+								headers = {'X-Requested-With':'XMLHttpRequest'},
+								callback=self.parse_extra, 
+								dont_filter=True)
+		yield request
+
 		hxs = HtmlXPathSelector(response)
 		top_apps_table = hxs.select('//tbody[@id="storestats-top-table"]/tr')
 		for row in top_apps_table:
@@ -29,6 +38,25 @@ class AppannieSpider(BaseSpider):
 				request = Request(urljoin("http://www.appannie.com", free_app_link[0]), self.parse_app)
 				request.meta['is_free'] = True 
 				yield request
+
+	def parse_extra(self, response):
+		hxs = HtmlXPathSelector(response)
+		extra_rows = hxs.select('//tr')
+		for row in extra_rows:
+			paid_app_link =  row.select('td[1]/span[@class="app-name"]/a/@href').extract()
+			if paid_app_link:
+				request = Request(urljoin("http://www.appannie.com", paid_app_link[0]), self.parse_app)
+				request.meta['is_free'] = False 
+				yield request
+
+			free_app_link =  row.select('td[2]/span[@class="app-name"]/a/@href').extract()
+			if free_app_link:
+				print urljoin("http://www.appannie.com", free_app_link[0])
+				request = Request(urljoin("http://www.appannie.com", free_app_link[0]), self.parse_app)
+				request.meta['is_free'] = True 
+				yield request
+
+
 
 	def parse_app(self, response):
 		hxs = HtmlXPathSelector(response)

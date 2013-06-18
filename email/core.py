@@ -86,7 +86,7 @@ class Emailer(object):
 			raise EmailerError(msg="SMTP authentication failed.")
 
 		if self.sender and self.recipient:
-			#self.smpt_server.sendmail(self.sender, self.recipient, self.msg.as_string())
+			self.smpt_server.sendmail(self.sender, self.recipient, self.msg.as_string())
 			logger.info('Sent email from %s to %s' % (self.sender, self.recipient))
 		else:
 			raise EmailerError("Either recipient or sender address has not been specified.")
@@ -113,15 +113,19 @@ class PersonalisedEmailer(Emailer):
 		logger.info("Personalising email for %s" % entry['Email'])
 		def repl(m):
 			rule_value = self.rules_dict[m.group(2)]
-			placeholder_value = entry[rule_value]
 
-			#If assisted is selected the user will review the placeholder values
-			if self.assisted:
-				c = None
-				while (c  not in ['Y', 'N']):
-					c = raw_input(" > Replace placeholder %s with '%s'? [Y/N]: " % (m.group(1) + m.group(2) +m.group(3), entry[rule_value]))
-				if c == 'N':
-					placeholder_value = raw_input(" > Type the correct value for placeholder %s : " % m.group(1) + m.group(2) +m.group(3))
+			if rule_value:
+				placeholder_value = entry[rule_value]
+
+				#If assisted is selected the user will review the placeholder values
+				if self.assisted:
+					c = None
+					while (c  not in ['Y', 'N']):
+						c = raw_input(" > Replace placeholder %s with '%s'? [Y/N]: " % (m.group(1) + m.group(2) +m.group(3), entry[rule_value]))
+					if c == 'N':
+						placeholder_value = raw_input(" > Type the correct value for placeholder %s : " % (m.group(1) + m.group(2) +m.group(3)))
+			else:
+				placeholder_value = raw_input(" > Type the correct value for placeholder %s : " % (m.group(1) + m.group(2) +m.group(3)))
 			return placeholder_value
 
 		self.msg.set_payload(re.sub(self.regex, repl, self.msg.get_payload()))
@@ -152,7 +156,7 @@ class PersonalisedEmailer(Emailer):
 							c = raw_input(" > Is it OK to send? [Y/N]")
 						if c == 'N':
 							logger.info("Skipping email to %s" % entry['Email'])
-							return
+							continue
 					try:
 						super(PersonalisedEmailer, self).send_mail()
 					except EmailerError, e:
