@@ -12,13 +12,13 @@ class AppannieSpider(BaseSpider):
 	name = "appannie"
 	allowed_domains = ["appannie.com"]
 
-	def __init__(self, country="united-states", category="health-and-fitness"):
-		self.start_urls = ['http://www.appannie.com/top/android/%s/application/%s/' % (country, category)]
+	def __init__(self, country="united-kingdom", category="application", sub_category="health-and-fitness"):
+		self.start_urls = ['http://www.appannie.com/top/android/%s/%s/%s/' % (country, category, sub_category)]
 
 	def parse(self, response):
 
 		#Make first 
-		request = Request("http://www.appannie.com/top-table/android/20130617-US-19/?p=2-&h=8&iap=all",
+		request = Request("http://www.appannie.com/top-table/android/20130701-GB-4/?p=2-&h=8&iap=all",
 								headers = {'X-Requested-With':'XMLHttpRequest'},
 								callback=self.parse_extra, 
 								dont_filter=True)

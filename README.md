@@ -6,7 +6,13 @@ The Growth Hacking Toolkit is a collection of growth hacking tools. Enjoy and co
 #Crawlers
 
 ##Run the AppAnnie crawler
-scrapy crawl appannie -a country=united-states -a category=health-and-fitness
+1. ```cd crawlers/appannie```
+2. ```scrapy crawl appannie -a country=united-kingdom -a category=game -a sub_category=brain```
+
+You can pass a number of parameters:
+- **country**  
+- **category**
+- **sub_category**
 
 ##Export the results into a csv file
 mongoexport --db appannie --csv --collection android_app --fieldFile fields.txt --out contacts.csv
