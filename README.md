@@ -17,3 +17,7 @@ You can pass a number of parameters:
 ##Export the results into a csv file
 mongoexport --db appannie --csv --collection android_app --fieldFile fields.txt --out contacts.csv
 
+You can filter the results using the query parameter:
+
+mongoexport --db appannie --csv --collection android_app --fieldFile fields.txt --query {min_downloads:10000} --out contacts.csv
+
