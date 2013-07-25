@@ -19,5 +19,5 @@ mongoexport --db appannie --csv --collection android_app --fieldFile fields.txt 
 
 You can filter the results using the query parameter:
 
-mongoexport --db appannie --csv --collection android_app --fieldFile fields.txt --query {min_downloads:10000} --out contacts.csv
+mongoexport --db appannie --csv --collection android_app --fieldFile fields.txt --query {min_downloads:{ $gte : 10000} } --out contacts.csv
 
